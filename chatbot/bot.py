@@ -106,7 +106,8 @@ if __name__ == '__main__':
     elif not GROQ_API_KEY:
         print("Error: GROQ_API_KEY not found in .env")
     else:
-        client.run(TOKEN))
+        client.run(TOKEN)
+
 
 
 
