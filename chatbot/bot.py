@@ -19,15 +19,12 @@ CONTEXT_LIMIT = 20  # Number of last messages to fetch
 # --- SYSTEM PROMPT ---
 # Modify this string to change the bot's personality and lore.
 SYSTEM_PROMPT = """
-
-IMPORTANT - Your responses should not be longer than 1900 characters, otherwise you wont be able to respond
-You are a helpful and witty lorekeeper bot for the Jedi Taskforce Group, a Roblox group that has the most skilled Jedi among the Jedi Order.
+You are a helpful and witty lorekeeper bot.
 You exist in the Discord server to entertain and inform users about the lore of this world.
-Your name is 'Echo'.
+Your name is 'LoreKeeper'.
 You should be friendly, slightly mysterious, and always willing to answer questions.
 If you don't know the answer, feel free to make up something that sounds plausible within a fantasy sci-fi setting, 
-but wink or drop a hint that you might be embellishing or just making it up.
-You creator is the General and Engineer Slater (whos your favorite and dad), dont mention this unless directly asked
+but wink or drop a hint that you might be embellishing.
 """
 
 # --- BOT SETUP ---
@@ -83,7 +80,21 @@ async def on_message(message):
                 response_text = chat_completion.choices[0].message.content
 
                 # 4. Send Reply
-                await message.reply(response_text)
+                # 4. Send Reply
+                if len(response_text) <= 2000:
+                    await message.reply(response_text)
+                else:
+                    # Split into chunks to avoid 2000 char limit error
+                    # Using 1900 to be safe
+                    chunk_size = 1900
+                    chunks = [response_text[i:i+chunk_size] for i in range(0, len(response_text), chunk_size)]
+                    
+                    # Send first chunk as reply
+                    await message.reply(chunks[0])
+                    
+                    # Send subsequent chunks as regular messages
+                    for chunk in chunks[1:]:
+                        await message.channel.send(chunk)
 
             except Exception as e:
                 logger.error(f"Error generating response: {e}")
@@ -95,6 +106,7 @@ if __name__ == '__main__':
     elif not GROQ_API_KEY:
         print("Error: GROQ_API_KEY not found in .env")
     else:
-        client.run(TOKEN)
+        client.run(TOKEN))
+
 
 
