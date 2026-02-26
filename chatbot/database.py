@@ -44,13 +44,13 @@ async def init_db():
 
         # Table: stories
         # Stores large text with lore and stories.
-        # We can implement a many-to-many relation for participants later if needed,
-        # but for now we'll rely on text content or metadata.
+        # Now includes homeworld linking for context-aware lore.
         await db.execute('''
             CREATE TABLE IF NOT EXISTS stories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT,
                 content TEXT NOT NULL,
+                homeworld TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -83,9 +83,9 @@ async def add_information(discord_id: int, category: str, content: str):
                          (discord_id, category, content))
         await db.commit()
 
-async def add_story(title: str, content: str):
+async def add_story(title: str, content: str, homeworld: str = None):
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute('INSERT INTO stories (title, content) VALUES (?, ?)', (title, content))
+        await db.execute('INSERT INTO stories (title, content, homeworld) VALUES (?, ?, ?)', (title, content, homeworld))
         await db.commit()
 
 async def get_user_profile(discord_id: int):
@@ -123,19 +123,39 @@ async def get_user_profile(discord_id: int):
             
     return profile
 
-async def get_recent_stories(limit=3):
+async def get_recent_stories(limit=3, homeworld: str = None):
     """
     Fetches the most recent stories to provide general lore context.
+    If homeworld is specified, prioritizes stories from that homeworld.
     """
     async with aiosqlite.connect(DB_NAME) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute('SELECT title, content FROM stories ORDER BY created_at DESC LIMIT ?', (limit,)) as cursor:
-            rows = await cursor.fetchall()
-            return [{'title': row['title'], 'content': row['content']} for row in rows]
+        if homeworld:
+            # Get homeworld-specific stories first, then general stories
+            async with db.execute('''
+                SELECT title, content, homeworld FROM stories 
+                WHERE homeworld = ? OR homeworld IS NULL
+                ORDER BY 
+                    CASE WHEN homeworld = ? THEN 0 ELSE 1 END,
+                    created_at DESC 
+                LIMIT ?
+            ''', (homeworld, homeworld, limit)) as cursor:
+                rows = await cursor.fetchall()
+        else:
+            async with db.execute('SELECT title, content, homeworld FROM stories ORDER BY created_at DESC LIMIT ?', (limit,)) as cursor:
+                rows = await cursor.fetchall()
+        return [{'title': row['title'], 'content': row['content'], 'homeworld': row['homeworld']} for row in rows]
 
 async def get_all_stories():
     async with aiosqlite.connect(DB_NAME) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute('SELECT id, title, content, created_at FROM stories ORDER BY created_at DESC') as cursor:
+        async with db.execute('SELECT id, title, content, homeworld, created_at FROM stories ORDER BY created_at DESC') as cursor:
             rows = await cursor.fetchall()
-            return [{'id': row['id'], 'title': row['title'], 'content': row['content'], 'created_at': row['created_at']} for row in rows]
+            return [{'id': row['id'], 'title': row['title'], 'content': row['content'], 'homeworld': row['homeworld'], 'created_at': row['created_at']} for row in rows]
+
+async def get_user_homeworld(discord_id: int):
+    """Get the homeworld of a user from their information."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute('SELECT content FROM information WHERE user_id = ? AND category = ?', (discord_id, 'Homeworld')) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
