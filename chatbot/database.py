@@ -159,3 +159,49 @@ async def get_user_homeworld(discord_id: int):
         async with db.execute('SELECT content FROM information WHERE user_id = ? AND category = ?', (discord_id, 'Homeworld')) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else None
+
+async def search_user_by_name(search_term: str):
+    """
+    Search for a user by their name or alias.
+    Returns the discord_id if found, None otherwise.
+    """
+    search_lower = search_term.lower()
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        
+        # First, try to find by exact name match
+        async with db.execute('SELECT discord_id FROM users WHERE LOWER(name) = ?', (search_lower,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row['discord_id']
+        
+        # Then try to find by alias match
+        async with db.execute('''
+            SELECT user_id FROM user_aliases 
+            WHERE LOWER(alias) = ? 
+            LIMIT 1
+        ''', (search_lower,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row['user_id']
+        
+        # Try partial match on names and aliases
+        async with db.execute('''
+            SELECT discord_id FROM users 
+            WHERE LOWER(name) LIKE ?
+            LIMIT 1
+        ''', (f'%{search_lower}%',)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row['discord_id']
+        
+        async with db.execute('''
+            SELECT user_id FROM user_aliases 
+            WHERE LOWER(alias) LIKE ?
+            LIMIT 1
+        ''', (f'%{search_lower}%',)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row['user_id']
+    
+    return None

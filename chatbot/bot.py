@@ -108,6 +108,22 @@ async def on_message(message):
                 target_id = mentioned_users[0].id if mentioned_users else message.author.id
                 target_user = mentioned_users[0] if mentioned_users else message.author
                 
+                # If no mentions, try to find users by name in the message content
+                if not mentioned_users and target_id == message.author.id:
+                    # Extract potential names from message (words that start with capitals or look like names)
+                    words = message.content.split()
+                    for word in words:
+                        # Skip common words and the bot mention
+                        if word.lower() in ['@echo', 'do', 'you', 'who', 'is', 'give', 'me', 'info', 'know', 'about', 'tell', 'any', 'information', 'the', 'of', 'and', 'for', 'this', 'that', 'they', 'them', 'their']:
+                            continue
+                        # Try to find this word as a user name/alias
+                        clean_word = word.strip('@')
+                        found_id = await database.search_user_by_name(clean_word)
+                        if found_id:
+                            target_id = found_id
+                            logger.info(f"Found user by name search: {clean_word} -> {found_id}")
+                            break
+                
                 author_profile = await database.get_user_profile(target_id)
                 author_context = ""
                 author_homeworld = None
