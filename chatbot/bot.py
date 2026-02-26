@@ -103,7 +103,12 @@ async def on_message(message):
                 context_str = "\n".join(history)
 
                 # 2. Fetch DB Context with homeworld awareness
-                author_profile = await database.get_user_profile(message.author.id)
+                # Check for mentioned users (excluding the bot itself)
+                mentioned_users = [u for u in message.mentions if u != client.user]
+                target_id = mentioned_users[0].id if mentioned_users else message.author.id
+                target_user = mentioned_users[0] if mentioned_users else message.author
+                
+                author_profile = await database.get_user_profile(target_id)
                 author_context = ""
                 author_homeworld = None
                 if author_profile:
@@ -148,7 +153,7 @@ async def on_message(message):
                 if memories:
                     logger.info(f"Found memories: {memories}")
                     for category, content in memories:
-                        await database.add_information(message.author.id, category.strip(), content.strip())
+                        await database.add_information(target_id, category.strip(), content.strip())
                     
                     response_text = re.sub(memory_pattern, "", response_text).strip()
 
