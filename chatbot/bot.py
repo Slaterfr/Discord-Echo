@@ -93,6 +93,11 @@ async def on_message(message):
     if client.user in message.mentions:
         logger.info(f"Bot mentioned by {message.author}: {message.content}")
         
+        # Check if author is Ash
+        if message.author.id == 1471628894049403001:
+            await message.reply("Ash message detected, ignoring...")
+            return
+
         async with message.channel.typing():
             try:
                 # 1. Fetch Context
